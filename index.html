@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trapping Rain Water</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:     #0d0e12;
+  --paper:   #eef2f7;
+  --rain:    #1e6fbf;
+  --rain2:   #2e8fd4;
+  --rain-l:  #a8cef0;
+  --rain-ll: #d6ecff;
+  --stone:   #6b6860;
+  --stone-l: #b8b5ae;
+  --accent:  #e05c1a;
+  --green:   #1a8a4a;
+  --grid:    rgba(30,111,191,0.06);
+  --glow:    rgba(30,111,191,0.18);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--paper);
+  font-family: 'Syne', sans-serif;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem 1.5rem 5rem;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Animated water background */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 110%, rgba(30,111,191,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 110%, rgba(46,143,212,0.06) 0%, transparent 55%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
+  pointer-events: none; z-index: 0;
+  animation: bgShift 8s ease-in-out infinite alternate;
+}
+
+@keyframes bgShift {
+  from { background-position: 0% 0%, 0% 0%, 0 0, 0 0; }
+  to   { background-position: 5% 3%, -3% 2%, 0 0, 0 0; }
+}
+
+/* Rain drops falling in background */
+.rain-drops {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+}
+.drop {
+  position: absolute; width: 1.5px; background: linear-gradient(to bottom, transparent, rgba(30,111,191,0.25));
+  border-radius: 2px; animation: fall linear infinite;
+}
+@keyframes fall {
+  from { transform: translateY(-60px); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.6; }
+  to   { transform: translateY(110vh); opacity: 0; }
+}
+
+.bg-label {
+  position: fixed; bottom: -1.5rem; right: -1rem;
+  font-size: clamp(5rem, 14vw, 11rem); font-weight: 800;
+  color: rgba(30,111,191,0.04); letter-spacing: -0.04em;
+  pointer-events: none; user-select: none; white-space: nowrap; z-index: 0;
+}
+
+.container { position: relative; z-index: 1; width: 100%; max-width: 800px; }
+
+/* ── Header ── */
+header { margin-bottom: 2.5rem; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rain); border: 1.5px solid var(--rain);
+  border-radius: 3px; padding: 3px 10px; margin-bottom: 0.75rem;
+}
+.badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--rain); animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+h1 { font-size: clamp(2rem,5vw,3.4rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.03em; }
+h1 .blue { color: var(--rain); position: relative; display: inline-block; }
+h1 .blue::after {
+  content: '';
+  position: absolute; bottom: 2px; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--rain), var(--rain2), transparent);
+  border-radius: 2px; animation: underlineFlow 3s ease-in-out infinite;
+}
+@keyframes underlineFlow {
+  0%, 100% { opacity: 0.5; transform: scaleX(0.7); transform-origin: left; }
+  50%       { opacity: 1;   transform: scaleX(1); }
+}
+
+.subtitle { font-size: 13px; color: var(--stone); font-family: 'JetBrains Mono', monospace; margin-top: 0.5rem; }
+
+/* ── Cards ── */
+.card {
+  background: #fff;
+  border: 1.5px solid rgba(30,111,191,0.12);
+  border-radius: 3px; overflow: hidden;
+  box-shadow: 6px 6px 0 rgba(30,111,191,0.08), 0 1px 20px rgba(30,111,191,0.05);
+  margin-bottom: 1.5rem;
+  animation: slideUp 0.55s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(24px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+.card-header {
+  background: linear-gradient(135deg, #0d1620 0%, #0f2035 100%);
+  color: #fff; padding: 1rem 1.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 0.5rem; position: relative; overflow: hidden;
+}
+.card-header::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(30,111,191,0.6), rgba(46,143,212,0.4), transparent);
+  animation: shimmer 3s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.4; transform: scaleX(0.6); }
+  50%       { opacity: 1;   transform: scaleX(1); }
+}
+
+.card-title { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.card-meta  { font-family: 'JetBrains Mono', monospace; font-size: 11px; opacity: 0.4; }
+
+/* ── Input zone ── */
+.input-zone { padding: 1.75rem 1.75rem 1.25rem; border-bottom: 1.5px solid rgba(30,111,191,0.07); }
+.input-hint {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--stone); margin-bottom: 0.75rem;
+}
+.input-row { display: flex; gap: 10px; align-items: stretch; }
+.input-wrapper { flex: 1; position: relative; }
+.input-wrapper::before {
+  content: '[ ]'; position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  color: var(--stone-l); pointer-events: none; z-index: 1;
+}
+#user-input {
+  width: 100%; height: 52px; padding: 0 14px 0 46px;
+  font-family: 'JetBrains Mono', monospace; font-size: 15px;
+  font-weight: 500; color: var(--ink);
+  background: #f5f8fc; border: 1.5px solid rgba(30,111,191,0.15);
+  border-radius: 3px; outline: none;
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+  letter-spacing: 0.02em;
+}
+#user-input:focus { border-color: var(--rain); box-shadow: 0 0 0 3px rgba(30,111,191,0.1); background: #fff; }
+#user-input.error   { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(224,92,26,0.1); }
+#user-input.success { border-color: var(--green);  box-shadow: 0 0 0 3px rgba(26,138,74,0.08); }
+
+.calc-btn {
+  height: 52px; padding: 0 26px;
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  background: linear-gradient(135deg, #0f2035, #1e4a7a);
+  color: #fff; border: 1.5px solid rgba(30,111,191,0.4);
+  border-radius: 3px; cursor: pointer;
+  transition: all 0.2s; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+  position: relative; overflow: hidden;
+}
+.calc-btn::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--rain), var(--rain2));
+  opacity: 0; transition: opacity 0.2s;
+}
+.calc-btn:hover::after { opacity: 1; }
+.calc-btn span { position: relative; z-index: 1; }
+.calc-btn:active { transform: scale(0.97); }
+.calc-btn .arr { font-size: 16px; transition: transform 0.2s; position: relative; z-index: 1; }
+.calc-btn:hover .arr { transform: translateX(4px); }
+
+.error-msg {
+  margin-top: 8px; font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--accent); min-height: 16px;
+}
+
+
+/* ── Result banner ── */
+.result-banner {
+  padding: 1.1rem 1.75rem; display: flex; align-items: center;
+  gap: 1rem; flex-wrap: wrap;
+  background: linear-gradient(90deg, rgba(30,111,191,0.06), rgba(30,111,191,0.02));
+  border-bottom: 1.5px solid rgba(30,111,191,0.14);
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.45s, transform 0.45s;
+  pointer-events: none;
+}
+.result-banner.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.result-pill {
+  font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700;
+  padding: 6px 18px;
+  background: linear-gradient(135deg, var(--rain), var(--rain2));
+  color: #fff; border-radius: 3px; letter-spacing: 0.04em;
+  box-shadow: 0 3px 12px rgba(30,111,191,0.3);
+  animation: pillGlow 2.5s ease-in-out infinite;
+}
+@keyframes pillGlow {
+  0%, 100% { box-shadow: 0 3px 12px rgba(30,111,191,0.3); }
+  50%       { box-shadow: 0 3px 20px rgba(30,111,191,0.55); }
+}
+.result-text { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--stone); }
+.result-text strong { color: var(--ink); }
+
+/* ── Canvas zone ── */
+.canvas-zone {
+  padding: 1.75rem 1.75rem 1.25rem;
+  background: linear-gradient(180deg, #f0f6ff 0%, #e8f2ff 100%);
+  border-bottom: 1.5px solid rgba(30,111,191,0.1);
+  position: relative; overflow: hidden;
+}
+
+/* Floating water particles in canvas zone */
+.canvas-zone::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle 120px at 20% 80%, rgba(30,111,191,0.06) 0%, transparent 70%),
+              radial-gradient(circle 80px at 75% 85%, rgba(46,143,212,0.05) 0%, transparent 70%);
+  pointer-events: none;
+  animation: waterGlow 4s ease-in-out infinite alternate;
+}
+@keyframes waterGlow {
+  from { opacity: 0.6; }
+  to   { opacity: 1; }
+}
+
+canvas { display: block; width: 100%; height: 240px; position: relative; z-index: 1; }
+
+/* ── Stats ── */
+.stats {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  border-bottom: 1.5px solid rgba(30,111,191,0.08);
+}
+.stat { padding: 1.25rem 1.5rem; border-right: 1.5px solid rgba(30,111,191,0.08); position: relative; }
+.stat:last-child { border-right: none; }
+.stat:first-child { background: rgba(30,111,191,0.03); }
+
+.stat-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--stone); margin-bottom: 0.4rem;
+}
+.stat-value {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
+  line-height: 1; color: var(--stone-l); transition: color 0.35s, transform 0.35s;
+}
+.stat-value.live  { color: var(--ink); }
+.stat-value.water { color: var(--rain) !important; }
+.stat-value.bump  { animation: bump 0.4s cubic-bezier(0.22,1,0.36,1); }
+@keyframes bump {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.stat-unit { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--stone-l); margin-top: 2px; }
+
+/* water fill bar under the stat */
+.stat-bar {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  background: rgba(30,111,191,0.08);
+}
+.stat-bar-fill {
+  height: 100%; background: linear-gradient(90deg, var(--rain), var(--rain2));
+  transition: width 0.9s cubic-bezier(0.22,1,0.36,1);
+  width: 0%;
+}
+
+/* ── Algo card ── */
+.algo-card {
+  background: #fff; border: 1.5px solid rgba(30,111,191,0.12);
+  border-radius: 3px;
+  box-shadow: 6px 6px 0 rgba(30,111,191,0.07), 0 1px 20px rgba(30,111,191,0.04);
+  overflow: hidden; opacity: 0; transform: translateY(16px);
+  transition: opacity 0.5s 0.12s, transform 0.5s 0.12s;
+}
+.algo-card.show { opacity: 1; transform: translateY(0); }
+
+.formula-banner {
+  background: linear-gradient(135deg, #0d1620, #0f2a45);
+  color: var(--rain-l);
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  padding: 0.9rem 1.5rem; display: flex;
+  align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  border-top: 1px solid rgba(30,111,191,0.2);
+}
+.kw { color: #f4c97a; } .fn { color: #7dd3fc; } .op { color: #e2e8f0; opacity: 0.45; }
+
+.algo-table-wrap { overflow-x: auto; padding: 1.25rem 1.5rem; }
+table { border-collapse: collapse; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 12px; min-width: 420px; }
+thead tr { border-bottom: 2px solid rgba(30,111,191,0.2); }
+th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--stone); padding: 6px 12px; text-align: center; font-weight: 500; }
+td { padding: 8px 12px; text-align: center; border-bottom: 1px solid rgba(30,111,191,0.05); color: var(--ink); font-weight: 500; transition: background 0.2s; }
+tr.has-water td { background: rgba(30,111,191,0.04); }
+tr.has-water:hover td { background: rgba(30,111,191,0.08); }
+tr.has-water td.water-col { color: var(--rain); font-weight: 700; }
+td.index-col   { color: var(--stone); }
+td.formula-col { color: var(--stone); font-size: 11px; }
+
+@keyframes popIn {
+  0%   { transform:scale(0.88); opacity:0; }
+  60%  { transform:scale(1.04); }
+  100% { transform:scale(1);    opacity:1; }
+}
+.pop-in { animation: popIn 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+</style>
+</head>
+<body>
+
+<!-- Animated rain drops -->
+<div class="rain-drops" id="rain-drops"></div>
+<div class="bg-label">WATER</div>
+
+<div class="container">
+
+  <header>
+    <div class="badge"><span class="badge-dot"></span>Algorithm Visualizer</div>
+    <h1>Trapping<br><span class="blue">Rain Water</span></h1>
+    <p class="subtitle">// Type your heights → watch the water fill in</p>
+  </header>
+
+  <!-- ① Input card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Enter Elevation Array</span>
+      <span class="card-meta">space or comma separated · integers 0–20</span>
+    </div>
+
+    <div class="input-zone">
+      <div class="input-hint">Height values</div>
+      <div class="input-row">
+        <div class="input-wrapper">
+          <input id="user-input" type="text" placeholder="e.g.  3 0 0 2 0 4"
+            autocomplete="off" spellcheck="false"
+            oninput="liveValidate()"
+            onkeydown="if(event.key==='Enter') calculate()" />
+        </div>
+        <button class="calc-btn" onclick="calculate()">
+          <span>Calculate</span> <span class="arr">→</span>
+        </button>
+      </div>
+      <div class="error-msg" id="err-msg"></div>
+    </div>
+
+    <div class="result-banner" id="result-banner">
+      <span class="result-pill" id="result-pill">—</span>
+      <span class="result-text" id="result-text"></span>
+    </div>
+  </div>
+
+  <!-- ② Visualization card -->
+  <div class="card" id="viz-card" style="display:none">
+    <div class="card-header">
+      <span class="card-title">Elevation Map</span>
+      <span class="card-meta" id="hdr-arr"></span>
+    </div>
+    <div class="canvas-zone">
+      <canvas id="viz" height="240"></canvas>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Trapped Water</div>
+        <div class="stat-value water" id="s-water">—</div>
+        <div class="stat-unit">units</div>
+        <div class="stat-bar"><div class="stat-bar-fill" id="bar-water"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Array Length</div>
+        <div class="stat-value" id="s-len">—</div>
+        <div class="stat-unit">elements</div>
+        <div class="stat-bar"><div class="stat-bar-fill" id="bar-len"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Max Height</div>
+        <div class="stat-value" id="s-max">—</div>
+        <div class="stat-unit">units</div>
+        <div class="stat-bar"><div class="stat-bar-fill" id="bar-max"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ Algorithm breakdown -->
+  <div class="algo-card" id="algo-card">
+    <div class="card-header">
+      <span class="card-title">Algorithm Breakdown</span>
+      <span class="card-meta">Two-pass DP · O(n) time · O(n) space</span>
+    </div>
+    <div class="formula-banner">
+      <span><span class="kw">for</span> each index i :</span>
+      <span>water[i] = <span class="fn">min</span>( leftMax[i] , rightMax[i] ) <span class="op">−</span> height[i]</span>
+    </div>
+    <div class="algo-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Index</th><th>Height</th><th>Left Max</th>
+            <th>Right Max</th><th>min(L,R)</th><th>Water</th><th>Formula</th>
+          </tr>
+        </thead>
+        <tbody id="algo-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ─── Rain drops setup ─── */
+(function() {
+  const container = document.getElementById('rain-drops');
+  for (let i = 0; i < 28; i++) {
+    const d = document.createElement('div');
+    d.className = 'drop';
+    const left   = Math.random() * 100;
+    const height = 20 + Math.random() * 55;
+    const dur    = 1.4 + Math.random() * 2.2;
+    const delay  = Math.random() * 4;
+    const op     = 0.12 + Math.random() * 0.2;
+    d.style.cssText = `left:${left}%;height:${height}px;animation-duration:${dur}s;animation-delay:${delay}s;opacity:${op}`;
+    container.appendChild(d);
+  }
+})();
+
+/* ─── State ─── */
+let arr         = [];
+let animFrame   = null;
+let waveOffset  = 0;
+let waterLevels = [];   // animated fill 0..1 per column
+let targetLevels = [];
+let isAnimating  = false;
+
+/* ─── Algorithm ─── */
+function solve(a) {
+  const n = a.length, L = [], R = [];
+  L[0] = a[0];
+  for (let i = 1; i < n; i++) L[i] = Math.max(L[i-1], a[i]);
+  R[n-1] = a[n-1];
+  for (let i = n-2; i >= 0; i--) R[i] = Math.max(R[i+1], a[i]);
+  let total = 0;
+  const w = a.map((_, i) => { const v = Math.min(L[i], R[i]) - a[i]; total += v; return v; });
+  return { total, w, L, R };
+}
+
+/* ─── Input ─── */
+function parse(raw) {
+  const parts = raw.trim().split(/[\s,]+/).filter(Boolean);
+  if (parts.length < 2) return null;
+  const nums = parts.map(Number);
+  if (nums.some(n => isNaN(n) || !Number.isInteger(n) || n < 0 || n > 20)) return null;
+  return nums;
+}
+
+function liveValidate() {
+  const inp = document.getElementById('user-input');
+  const err = document.getElementById('err-msg');
+  const raw = inp.value;
+  if (!raw.trim()) { inp.className = ''; err.textContent = ''; return; }
+  const ok = parse(raw);
+  inp.className   = ok ? 'success' : 'error';
+  err.textContent = ok ? '' : 'Use whole numbers 0–20, separated by spaces or commas. Min 2 values.';
+}
+
+function calculate() {
+  const raw    = document.getElementById('user-input').value;
+  const parsed = parse(raw);
+  const err    = document.getElementById('err-msg');
+  if (!parsed) {
+    document.getElementById('user-input').className = 'error';
+    err.textContent = 'Please enter valid integers (0–20), min 2 values.';
+    document.getElementById('user-input').focus();
+    return;
+  }
+  arr = parsed;
+  document.getElementById('user-input').className = 'success';
+  err.textContent = '';
+
+  const vc = document.getElementById('viz-card');
+  vc.style.display = 'block';
+  vc.classList.remove('pop-in');
+  void vc.offsetWidth;
+  vc.classList.add('pop-in');
+
+  document.getElementById('algo-card').classList.add('show');
+
+  /* reset water levels and animate fill */
+  const { w } = solve(arr);
+  waterLevels  = arr.map(() => 0);
+  targetLevels = w.map((wi, i) => wi);   // actual water units per column
+
+  updateStats();
+  updateTable();
+  startAnimation();
+  setTimeout(() => vc.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+}
+
+function preset(val) {
+  document.getElementById('user-input').value = val;
+  document.getElementById('user-input').className = 'success';
+  document.getElementById('err-msg').textContent = '';
+  calculate();
+}
+
+function randVal() {
+  const n = 5 + Math.floor(Math.random() * 6);
+  return Array.from({ length: n }, () => Math.floor(Math.random() * 11)).join(' ');
+}
+
+/* ─── Canvas ─── */
+const cv  = document.getElementById('viz');
+const ctx = cv.getContext('2d');
+
+function startAnimation() {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  isAnimating = true;
+  const startTime = performance.now();
+  const fillDur   = 1200; // ms for water to rise
+
+  function loop(now) {
+    const t = Math.min(1, (now - startTime) / fillDur);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out quad
+
+    /* update animated levels */
+    let stillGoing = false;
+    for (let i = 0; i < arr.length; i++) {
+      waterLevels[i] = targetLevels[i] * ease;
+      if (ease < 1) stillGoing = true;
+    }
+
+    waveOffset = now * 0.002;
+    drawFrame();
+
+    if (stillGoing) {
+      animFrame = requestAnimationFrame(loop);
+    } else {
+      waterLevels = [...targetLevels];
+      isAnimating = false;
+      /* keep wave looping after fill */
+      function waveLoop(ts) {
+        waveOffset = ts * 0.002;
+        drawFrame();
+        animFrame = requestAnimationFrame(waveLoop);
+      }
+      animFrame = requestAnimationFrame(waveLoop);
+    }
+  }
+  animFrame = requestAnimationFrame(loop);
+}
+
+function drawFrame() {
+  const dpr = window.devicePixelRatio || 1;
+  const CW  = cv.parentElement.clientWidth - 56;
+  const CH  = 240;
+  cv.width  = CW * dpr; cv.height = CH * dpr;
+  cv.style.width = CW + 'px'; cv.style.height = CH + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, CW, CH);
+
+  const n    = arr.length;
+  const maxH = Math.max(...arr, 1);
+  const px = 8, py = 28;
+  const bw  = Math.max(10, Math.floor((CW - px*2) / n) - 4);
+  const gap = Math.max(2,  Math.floor((CW - px*2 - bw*n) / (n+1)));
+  const sc  = (CH - py*2) / maxH;
+  const { w } = solve(arr);
+
+  /* ── draw each column ── */
+  for (let i = 0; i < n; i++) {
+    const x     = px + gap + i * (bw + gap);
+    const bh    = arr[i] * sc;
+    const wFull = w[i] * sc;
+    const wAnim = waterLevels[i] * sc;
+    const totH  = bh + wAnim;
+
+    /* === WATER === */
+    if (wAnim > 0.5) {
+      const waterTop = CH - py - totH;
+      const waterBot = CH - py - bh;
+      const wHActual = waterBot - waterTop;
+
+      /* base water body — gradient from deep to surface */
+      const grad = ctx.createLinearGradient(x, waterTop, x, waterBot);
+      grad.addColorStop(0,   'rgba(20,90,170,0.35)');
+      grad.addColorStop(0.5, 'rgba(30,111,191,0.28)');
+      grad.addColorStop(1,   'rgba(50,140,210,0.22)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, waterTop, bw, wHActual);
+
+      /* inner light scatter */
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, waterTop, bw, wHActual); ctx.clip();
+
+      /* caustic shimmer lines (animate) */
+      for (let s = 0; s < 4; s++) {
+        const lineY = waterTop + wHActual * (0.2 + s * 0.2) + Math.sin(waveOffset * 1.8 + i * 0.7 + s) * 2.5;
+        const alpha = 0.15 + 0.12 * Math.sin(waveOffset * 2 + s * 1.2 + i * 0.5);
+        ctx.fillStyle = `rgba(140,200,255,${alpha})`;
+        ctx.fillRect(x + 3, lineY, bw - 6, 1.5);
+      }
+
+      /* depth gradient overlay */
+      const depthGrad = ctx.createLinearGradient(x, waterTop, x + bw, waterTop);
+      depthGrad.addColorStop(0,   'rgba(255,255,255,0.06)');
+      depthGrad.addColorStop(0.5, 'rgba(255,255,255,0.0)');
+      depthGrad.addColorStop(1,   'rgba(0,40,100,0.06)');
+      ctx.fillStyle = depthGrad;
+      ctx.fillRect(x, waterTop, bw, wHActual);
+
+      ctx.restore();
+
+      /* ── animated wave surface ── */
+      const waveAmp  = Math.min(2.2, wHActual * 0.06);
+      const wavePts  = 14;
+      const waveStep = bw / wavePts;
+
+      ctx.beginPath();
+      ctx.moveTo(x, waterBot);
+      ctx.lineTo(x, waterTop + waveAmp);
+
+      for (let p = 0; p <= wavePts; p++) {
+        const wx = x + p * waveStep;
+        const wy = waterTop + Math.sin(waveOffset * 3 + p * 0.8 + i * 1.1) * waveAmp
+                            + Math.sin(waveOffset * 5 + p * 1.4 + i * 0.6) * waveAmp * 0.4;
+        if (p === 0) ctx.lineTo(wx, wy);
+        else         ctx.lineTo(wx, wy);
+      }
+
+      ctx.lineTo(x + bw, waterBot);
+      ctx.closePath();
+      const surfaceGrad = ctx.createLinearGradient(x, waterTop - 2, x, waterTop + 6);
+      surfaceGrad.addColorStop(0, 'rgba(100,180,255,0.0)');
+      surfaceGrad.addColorStop(1, 'rgba(30,111,191,0.35)');
+      ctx.fillStyle = surfaceGrad;
+      ctx.fill();
+
+      /* surface line glow */
+      ctx.beginPath();
+      ctx.moveTo(x, waterTop + Math.sin(waveOffset * 3 + i * 1.1) * waveAmp);
+      for (let p = 0; p <= wavePts; p++) {
+        const wx = x + p * waveStep;
+        const wy = waterTop + Math.sin(waveOffset * 3 + p * 0.8 + i * 1.1) * waveAmp
+                            + Math.sin(waveOffset * 5 + p * 1.4 + i * 0.6) * waveAmp * 0.4;
+        ctx.lineTo(wx, wy);
+      }
+      ctx.strokeStyle = `rgba(80,170,255,${0.55 + 0.2 * Math.sin(waveOffset + i)})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      /* water amount label */
+      if (wHActual > 16 && w[i] > 0 && waterLevels[i] >= targetLevels[i] * 0.9) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.font = `700 10px 'JetBrains Mono',monospace`;
+        ctx.textAlign = 'center';
+        const lx = x + bw / 2;
+        const ly = waterTop + wHActual / 2 + 4;
+        ctx.fillText('+' + w[i], lx, ly);
+      }
+
+      /* side highlight (left edge glow) */
+      const sideGrad = ctx.createLinearGradient(x, 0, x + 6, 0);
+      sideGrad.addColorStop(0, 'rgba(120,200,255,0.18)');
+      sideGrad.addColorStop(1, 'rgba(120,200,255,0)');
+      ctx.fillStyle = sideGrad;
+      ctx.fillRect(x, waterTop, 6, wHActual);
+    }
+
+    /* === STONE BAR === */
+    if (arr[i] > 0) {
+      /* main bar */
+      const stoneGrad = ctx.createLinearGradient(x, CH - py - bh, x + bw, CH - py);
+      stoneGrad.addColorStop(0, '#44444e');
+      stoneGrad.addColorStop(1, '#2e2e36');
+      ctx.fillStyle = stoneGrad;
+      ctx.fillRect(x, CH - py - bh, bw, bh);
+
+      /* left highlight */
+      const hlGrad = ctx.createLinearGradient(x, 0, x + 4, 0);
+      hlGrad.addColorStop(0, 'rgba(255,255,255,0.1)');
+      hlGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hlGrad;
+      ctx.fillRect(x, CH - py - bh, 4, bh);
+
+      /* top cap */
+      ctx.fillStyle = '#5c5c68';
+      ctx.fillRect(x, CH - py - bh, bw, 4);
+
+      /* wet bottom (where water meets stone) */
+      if (waterLevels[i] > 0) {
+        const wetH = Math.min(bh * 0.25, 14);
+        const wetGrad = ctx.createLinearGradient(x, CH - py - bh, x, CH - py - bh + wetH);
+        wetGrad.addColorStop(0, 'rgba(30,111,191,0.22)');
+        wetGrad.addColorStop(1, 'rgba(30,111,191,0)');
+        ctx.fillStyle = wetGrad;
+        ctx.fillRect(x, CH - py - bh, bw, wetH);
+      }
+    }
+
+    /* height label */
+    const topY = CH - py - (arr[i] * sc) - (waterLevels[i] * sc) - 7;
+    if (bw > 14 && topY > 6) {
+      ctx.fillStyle = '#1a2030';
+      ctx.font = `700 11px 'JetBrains Mono',monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(arr[i], x + bw / 2, topY);
+    }
+
+    /* ground shadow */
+    ctx.fillStyle = 'rgba(30,111,191,0.1)';
+    ctx.fillRect(x, CH - py, bw, 2);
+
+    /* index */
+    if (bw > 12) {
+      ctx.fillStyle = '#9aa5b4';
+      ctx.font = `400 9px 'JetBrains Mono',monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText(i, x + bw / 2, CH - py + 14);
+    }
+  }
+
+  /* ground line */
+  ctx.strokeStyle = 'rgba(30,111,191,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px, CH - py + 1); ctx.lineTo(CW - px, CH - py + 1); ctx.stroke();
+
+  /* water table glow at bottom */
+  const grd = ctx.createLinearGradient(0, CH - py - 4, 0, CH - py + 6);
+  grd.addColorStop(0, 'rgba(30,111,191,0.12)');
+  grd.addColorStop(1, 'rgba(30,111,191,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(px, CH - py - 4, CW - px*2, 10);
+}
+
+/* ─── Stats ─── */
+function updateStats() {
+  const { total, w } = solve(arr);
+  const n      = arr.length;
+  const maxVal = Math.max(...arr);
+
+  const sw = document.getElementById('s-water');
+  const sl = document.getElementById('s-len');
+  const sm = document.getElementById('s-max');
+
+  [sw, sl, sm].forEach(el => { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); });
+
+  sw.textContent = total; sw.className = 'stat-value water live';
+  sl.textContent = n;     sl.className = 'stat-value live';
+  sm.textContent = maxVal; sm.className = 'stat-value live';
+
+  document.getElementById('hdr-arr').textContent = '[ ' + arr.join(', ') + ' ]';
+
+  /* animated stat bars */
+  setTimeout(() => {
+    document.getElementById('bar-water').style.width = Math.min(100, total * 5) + '%';
+    document.getElementById('bar-len').style.width   = Math.min(100, n * 7)     + '%';
+    document.getElementById('bar-max').style.width   = Math.min(100, maxVal * 5) + '%';
+  }, 100);
+
+  const banner = document.getElementById('result-banner');
+  banner.classList.add('show');
+  document.getElementById('result-pill').textContent = total + ' unit' + (total !== 1 ? 's' : '');
+  document.getElementById('result-text').innerHTML =
+    `of rain water trapped across <strong>${n}</strong> column${n !== 1 ? 's' : ''}`;
+}
+
+/* ─── Table ─── */
+function updateTable() {
+  const { w, L, R } = solve(arr);
+  const tbody = document.getElementById('algo-body');
+  tbody.innerHTML = '';
+  arr.forEach((v, i) => {
+    const mn = Math.min(L[i], R[i]);
+    const wi = w[i];
+    const tr = document.createElement('tr');
+    if (wi > 0) tr.className = 'has-water';
+    tr.innerHTML = `
+      <td class="index-col">[${i}]</td>
+      <td>${v}</td><td>${L[i]}</td><td>${R[i]}</td>
+      <td>${mn}</td>
+      <td class="water-col">${wi > 0 ? '+' + wi : '0'}</td>
+      <td class="formula-col">min(${L[i]},${R[i]})−${v}=${wi}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* resize */
+let ro = new ResizeObserver(() => { if (arr.length) drawFrame(); });
+ro.observe(document.querySelector('.canvas-zone') || document.body);
+
+document.getElementById('user-input').focus();
+</script>
+</body>
+</html>
